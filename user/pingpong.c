@@ -2,7 +2,7 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int main() {
+int main(void) {
   int parent2child[2];
   int child2parent[2];
   pipe(parent2child);

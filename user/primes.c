@@ -2,7 +2,7 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-void solve() {
+void solve(void) {
   int prime;
   if (read(0, &prime, sizeof(prime)) <= 0) {
     return;
@@ -40,7 +40,7 @@ void solve() {
   }
 }
 
-int main() {
+int main(void) {
   int firstPipe[2];
   pipe(firstPipe);
   if (fork() == 0) {
