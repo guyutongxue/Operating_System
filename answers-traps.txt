@@ -1,0 +1,40 @@
+RISC-V assembly
+===============
+
+1. Which registers contain arguments to functions? For example, which register holds 13 in main's call to `printf`?
+-----
+
+`a0`, `a1`, `a2`, etc.. When calling `printf`, `13` is hold by `a2` register.
+
+2. Where is the call to function `f` in the assembly code for main? Where is the call to `g`? (Hint: the compiler may inline functions.)
+-----
+
+There is no calling instruction for both `f` and `g`. The result of expression `f(8)+1` is just optimized to `12` by compiler.
+
+3. At what address is the function `printf` located?
+-----
+
+`0x628`.
+
+4. What value is in the register ra just after the `jalr` to `printf` in main?
+-----
+
+`0x38`.
+
+5.
+-----
+
+The output is `He110 World`.
+
+I'll set `i` to `0x726c6400` in order to yield the same output. There is no need to change 57616.
+
+6.
+-----
+
+The current value stored in register `a1`. Because the second argument is missing from the call, but `printf` will try to fetch this from register.
+
+
+
+
+
+
