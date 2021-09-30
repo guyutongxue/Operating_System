@@ -119,5 +119,8 @@ uint64 sys_sigalarm(void) {
 }
 
 uint64 sys_sigreturn(void) {
+  struct proc* p = myproc();
+  alarm_restore_context(p);
+  p->alarm_running_handler = 0;
   return 0;
 }

@@ -106,5 +106,40 @@ struct proc {
 
   int alarm_interval;
   uint64 alarm_handler;
-  int alarm_ticks_since_prev;
+  int alarm_ticks_since_prev;  // -1 represents no handler
+  struct {
+    uint64 epc;           // saved user program counter
+    uint64 ra;
+    uint64 sp;
+    uint64 gp;
+    uint64 tp;
+    uint64 t0;
+    uint64 t1;
+    uint64 t2;
+    uint64 s0;
+    uint64 s1;
+    uint64 a0;
+    uint64 a1;
+    uint64 a2;
+    uint64 a3;
+    uint64 a4;
+    uint64 a5;
+    uint64 a6;
+    uint64 a7;
+    uint64 s2;
+    uint64 s3;
+    uint64 s4;
+    uint64 s5;
+    uint64 s6;
+    uint64 s7;
+    uint64 s8;
+    uint64 s9;
+    uint64 s10;
+    uint64 s11;
+    uint64 t3;
+    uint64 t4;
+    uint64 t5;
+    uint64 t6;
+  } alarm_context;
+  int alarm_running_handler;
 };

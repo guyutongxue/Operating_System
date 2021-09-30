@@ -29,6 +29,8 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -80,9 +82,11 @@ usertrap(void)
   if(which_dev == 2) {
     if (p->alarm_ticks_since_prev >= 0) {
       p->alarm_ticks_since_prev++;
-      if (p->alarm_ticks_since_prev >= p->alarm_interval) {
-        p->alarm_ticks_since_prev = 0;
+      if (p->alarm_ticks_since_prev >= p->alarm_interval
+          && p->alarm_running_handler == 0) {
+        alarm_save_context(p);
         p->trapframe->epc = p->alarm_handler;
+        p->alarm_running_handler = 1;
       }
     } 
     yield();
