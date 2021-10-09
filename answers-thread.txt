@@ -1,0 +1,1 @@
+Two thread calling `insert` simultaneously with same `p` (bucket) argument. Then one of them will be overwritten by the other.
