@@ -68,9 +68,18 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+    uint64 scause = r_scause();
+    if (scause == 13 || scause == 15) {
+      // page fault
+      if (lazy_alloc() < 0) {
+        printf("lazy_alloc() failed.\n");
+        p->killed = 1;
+      }
+    } else {
+      printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   }
 
   if(p->killed)
