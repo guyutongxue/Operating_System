@@ -71,8 +71,8 @@ usertrap(void)
     uint64 scause = r_scause();
     if (scause == 13 || scause == 15) {
       // page fault
-      if (lazy_alloc() < 0) {
-        printf("lazy_alloc() failed.\n");
+      if (lazy_alloc(r_stval()) < 0) {
+        // printf("lazy_alloc() failed.\n");
         p->killed = 1;
       }
     } else {

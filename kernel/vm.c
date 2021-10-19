@@ -104,6 +104,14 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
+  // lazytests(4):
+  // Lazy allocate when asking for VA from
+  // syscall like read/write.
+  if (pte == 0 || (*pte & PTE_V) == 0) {
+    if (lazy_alloc(va) < 0) {
+      return 0;
+    }
+  }
   if(pte == 0)
     return 0;
   if((*pte & PTE_V) == 0)
@@ -184,7 +192,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      // panic("uvmunmap: walk");
+      continue; // lazytests(3)
     if((*pte & PTE_V) == 0) {
       *pte = 0;
       continue;
@@ -319,10 +328,13 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
+    // lazytests(3): Copy memory should work with empty pte.
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      // panic("uvmcopy: pte should exist");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      // panic("uvmcopy: page not present");
+      continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -446,10 +458,21 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-int lazy_alloc(void) {
-  uint64 va = r_stval();
+int lazy_alloc(uint64 va) {
   struct proc* p = myproc();
   
+  // lazytests(2):
+  // Kill process if VA higher than memory size.
+  if (va >= p->sz) {
+    return -1;
+  }
+
+  // lazytests(6):
+  // Kill process if VA lower than user stack.
+  if (va <= PGROUNDDOWN(p->trapframe->sp)) {
+    return -1;
+  }
+
   va = PGROUNDDOWN(va);
   char* mem = kalloc();
   if(mem == 0) {
@@ -457,6 +480,7 @@ int lazy_alloc(void) {
   }
   memset(mem, 0, PGSIZE);
   if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0) {
+    // lazytest(5): Already implemented.
     kfree(mem);
     return -1;
   }
