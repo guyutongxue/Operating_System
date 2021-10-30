@@ -361,6 +361,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    if (va0 > MAXVA) return -1;
+    if (copy_on_write(pagetable, va0) < 0) return -1;
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
@@ -452,7 +454,9 @@ int copy_on_write(pagetable_t pagetable, uint64 va) {
   }
 
   if((*pte & PTE_COW) == 0) {
-    return -1;
+    // Change the retval to 1, since `copyout` will
+    // copy non-COW page which is not an error.
+    return 1;
   }
 
   uint64 pa = PTE2PA(*pte);
