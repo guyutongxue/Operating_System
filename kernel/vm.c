@@ -442,3 +442,28 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+int copy_on_write(pagetable_t pagetable, uint64 va) {
+  va = PGROUNDDOWN(va);
+  pte_t* pte = walk(pagetable, va, 0);
+  if(pte == 0) {
+    return -1;
+  }
+
+  if((*pte & PTE_COW) == 0) {
+    return -1;
+  }
+
+  uint64 pa = PTE2PA(*pte);
+  char* mem = kalloc();
+  if(mem == 0) {
+    return -1;
+  }
+
+  memmove(mem, (void*)pa, PGSIZE);
+  uint flags = PTE_FLAGS(*pte);
+  flags &= ~PTE_COW;
+  flags |= PTE_W;
+  *pte = PA2PTE(mem) | flags;
+  return 0;
+}
