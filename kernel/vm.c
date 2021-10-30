@@ -329,6 +329,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       goto err;
     }
+    refcnt_inc((void*)pa);
   }
   return 0;
 
@@ -464,6 +465,12 @@ int copy_on_write(pagetable_t pagetable, uint64 va) {
   uint flags = PTE_FLAGS(*pte);
   flags &= ~PTE_COW;
   flags |= PTE_W;
-  *pte = PA2PTE(mem) | flags;
+  // Unmap old va, then remap a new one (instead of modifying PTE).
+  // While unmapping, call refcnt_dec on the physical page.
+  uvmunmap(pagetable, va, 1, 1);
+  if(mappages(pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
+    uvmunmap(pagetable, va, 1, 1);
+    return -1;
+  }
   return 0;
 }

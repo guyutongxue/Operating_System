@@ -23,10 +23,50 @@ struct {
   struct run *freelist;
 } kmem;
 
+#define PA2IDX(pa) (((uint64)(pa) - KERNBASE) >> PGSHIFT)
+#define NPAGES ((PHYSTOP - KERNBASE) >> PGSHIFT)
+struct {
+  struct spinlock lock;
+  int count[NPAGES];
+} refcnt;
+
+void refcnt_init(void) {
+  initlock(&refcnt.lock, "refcnt");
+  for (int i = 0; i < NPAGES; i++) {
+    refcnt.count[i] = 0;
+  }
+}
+
+void refcnt_inc(void* pa) {
+  acquire(&refcnt.lock);
+  refcnt.count[PA2IDX(pa)]++;
+  release(&refcnt.lock);
+}
+
+void refcnt_dec(void* pa) {
+  acquire(&refcnt.lock);
+  refcnt.count[PA2IDX(pa)]--;
+  release(&refcnt.lock);
+}
+
+int refcnt_get(void* pa) {
+  acquire(&refcnt.lock);
+  int count = refcnt.count[PA2IDX(pa)];
+  release(&refcnt.lock);
+  return count;
+}
+
+void refcnt_set(void* pa, int count) {
+  acquire(&refcnt.lock);
+  refcnt.count[PA2IDX(pa)] = count;
+  release(&refcnt.lock);
+}
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  refcnt_init();
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -50,6 +90,11 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+
+  refcnt_dec(pa);
+  if(refcnt_get(pa) > 0)
+    return;
+  refcnt_set(pa, 0);
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -76,7 +121,9 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r) {
     memset((char*)r, 5, PGSIZE); // fill with junk
+    refcnt_inc((void*)r);
+  }
   return (void*)r;
 }

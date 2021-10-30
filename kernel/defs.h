@@ -154,6 +154,10 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+void            refcnt_init(void);
+void            refcnt_inc(void*);
+void            refcnt_dec(void*);
+int             refcnt_get(void*);
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);
