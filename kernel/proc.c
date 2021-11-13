@@ -20,6 +20,7 @@ static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
 extern char etext[];  // kernel.ld sets this to end of kernel code
+extern pagetable_t kernel_pagetable; // vm.c
 
 extern char trampoline[]; // trampoline.S
 
@@ -513,6 +514,11 @@ scheduler(void)
     }
 #if !defined (LAB_FS)
     if(found == 0) {
+
+      // Use global kernel pagetable when no process is runnable.
+      w_satp(MAKE_SATP(kernel_pagetable));
+      sfence_vma();
+
       intr_on();
       asm volatile("wfi");
     }
