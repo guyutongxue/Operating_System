@@ -19,6 +19,8 @@ extern void forkret(void);
 static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
+extern char etext[];  // kernel.ld sets this to end of kernel code
+
 extern char trampoline[]; // trampoline.S
 
 // initialize the proc table at boot time.
@@ -115,7 +117,9 @@ found:
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
-  if(p->pagetable == 0){
+  // A kernel page table per proc.
+  p->kpagetable = proc_kpagetable();
+  if(p->pagetable == 0 || p->kpagetable == 0) {
     freeproc(p);
     release(&p->lock);
     return 0;
@@ -183,6 +187,23 @@ proc_pagetable(struct proc *p)
   }
 
   return pagetable;
+}
+
+// Create kernal page table per proc.
+// Modified from vm.c/kvminit
+pagetable_t proc_kpagetable(void) {
+  pagetable_t kpgtbl = (pagetable_t)kalloc();
+
+  memset(kpgtbl, 0, PGSIZE);
+  mappages(kpgtbl, UART0, PGSIZE, UART0, PTE_R | PTE_W);
+  mappages(kpgtbl, VIRTIO0, PGSIZE, VIRTIO0, PTE_R | PTE_W);
+  // mappages(kpgtbl, CLINT, 0x10000, CLINT, PTE_R | PTE_W);
+  mappages(kpgtbl, PLIC, 0x400000, PLIC, PTE_R | PTE_W);
+  mappages(kpgtbl, KERNBASE, (uint64)etext - KERNBASE, KERNBASE, PTE_R | PTE_X);
+  mappages(kpgtbl, (uint64)etext, PHYSTOP - (uint64)etext, (uint64)etext, PTE_R | PTE_W);
+  mappages(kpgtbl, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X);
+  
+  return kpgtbl;
 }
 
 // Free a process's page table, and free the
