@@ -1,3 +1,7 @@
 `pte printout` Answer:
 
 Page 0 contains the program's text and data. Page 2 is the process's stack. We can't rw into page 1, because it is the guard page (which rw to it cause exception.).
+
+`copyin` Answer:
+
+Because arithmetic expression `srcva + len` may cause overflow, in result of `srcva + len < srcva`.

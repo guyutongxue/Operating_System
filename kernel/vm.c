@@ -337,6 +337,36 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return -1;
 }
 
+// Copy user pagetable to kernel pagetable per proc.
+int u2kvmcopy(pagetable_t upgtbl, pagetable_t kpgtbl, uint64 begin, uint64 end) {
+  
+  if (end < begin) {
+    return -1;
+  }
+  if (PGROUNDUP(end) >= PLIC) {
+    return -1;
+  }
+
+  begin = PGROUNDUP(begin);
+
+  for (uint64 i = begin; i < end; i += PGSIZE) {
+    pte_t* u_pte;
+    pte_t* k_pte;
+    if ((u_pte = walk(upgtbl, i, 0)) == 0) {
+      panic("u2kvmcopy: upgtbl pte not exist");
+    }
+    if ((*u_pte & PTE_V) == 0) {
+      panic("u2kvmcopy: upgtbl pte not present");
+    }
+    if ((k_pte = walk(kpgtbl, i, 1)) == 0) {
+      panic("u2kvmcopy: kpgtbl pte alloc failed");
+    }
+    uint64 pa = PTE2PA(*u_pte);
+    uint flags = PTE_FLAGS(*u_pte) & ~PTE_U;
+    *k_pte = PA2PTE(pa) | flags;
+  }
+  return 0;
+}
 // mark a PTE invalid for user access.
 // used by exec for the user stack guard page.
 void
@@ -381,23 +411,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
-
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
-
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  return copyin_new(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -407,40 +421,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
-  int got_null = 0;
-
-  while(got_null == 0 && max > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > max)
-      n = max;
-
-    char *p = (char *) (pa0 + (srcva - va0));
-    while(n > 0){
-      if(*p == '\0'){
-        *dst = '\0';
-        got_null = 1;
-        break;
-      } else {
-        *dst = *p;
-      }
-      --n;
-      --max;
-      p++;
-      dst++;
-    }
-
-    srcva = va0 + PGSIZE;
-  }
-  if(got_null){
-    return 0;
-  } else {
-    return -1;
-  }
+  return copyinstr_new(pagetable, dst, srcva, max);
 }
 
 void vmprint_walk(pagetable_t pagetable, int level) {
