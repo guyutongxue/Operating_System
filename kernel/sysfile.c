@@ -309,6 +309,32 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
+
+    if (!(omode & O_NOFOLLOW)) {
+      // Follow to the link target.
+      int depth = 10;
+      while (1) {
+        if (ip->type != T_SYMLINK) break;
+        if (depth-- == 0) goto err;
+        if (ip->size > MAXPATH) goto err;
+        if (readi(ip, 0, (uint64)path, 0, ip->size) != ip->size) goto err;
+
+        iunlockput(ip);
+        if ((ip = namei(path)) == 0){
+          end_op();
+          return -1;
+        }
+        ilock(ip);
+
+        continue;
+      err:
+        iunlockput(ip);
+        end_op();
+        return -1;
+
+      }
+    }
+
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
@@ -341,7 +367,7 @@ sys_open(void)
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 
-  if((omode & O_TRUNC) && ip->type == T_FILE){
+  if((omode & O_TRUNC) && (ip->type == T_FILE || ip->type == T_SYMLINK)){
     itrunc(ip);
   }
 
@@ -486,5 +512,24 @@ sys_pipe(void)
 }
 
 uint64 sys_symlink(void) {
-  panic("symlink not impl. yet");
+  char target[MAXPATH];
+  char path[MAXPATH];
+  
+  if (argstr(0, target, MAXPATH) < 0 || 
+      argstr(1, path, MAXPATH) < 0) {
+    return -1;
+  }
+
+  struct inode* ip;
+  begin_op();
+  if ((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+  if (writei(ip, 0, (uint64)target, 0, strlen(target) + 1) <= 0) {
+    panic("symlink: writei");
+  }
+  iunlockput(ip);
+  end_op();
+  return 0;
 }
