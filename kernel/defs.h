@@ -72,6 +72,8 @@ void            end_op(void);
 
 // mmap.c
 int             page_fault_handler(uint64);
+int             munmap(uint64, int);
+int             mmcopy(struct proc*, struct proc*);
 
 // pipe.c
 int             pipealloc(struct file**, struct file**);

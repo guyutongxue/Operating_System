@@ -304,6 +304,8 @@ fork(void)
 
   np->state = RUNNABLE;
 
+  mmcopy(p, np);
+
   release(&np->lock);
 
   return pid;
@@ -353,6 +355,10 @@ exit(int status)
       fileclose(f);
       p->ofile[fd] = 0;
     }
+  }
+
+  while (p->nvma) {
+    munmap(p->vma[0].start, p->vma[0].end - p->vma[0].start);
   }
 
   begin_op();

@@ -156,3 +156,31 @@ uint64 sys_munmap(void) {
   }
   return munmap(addr, length);
 }
+
+int mmcopy(struct proc* old, struct proc* new) {
+  new->nvma = old->nvma;
+  for (int i = 0; i < old->nvma; i++) {
+    struct vma* v = &old->vma[i];
+    new->vma[i] = *v;
+    new->vma[i].file = filedup(v->file);
+    for (int va = v->start; va < v->end; va += PGSIZE){
+      uint64 pa = walkaddr(old->pagetable, va);
+      if (pa == 0) continue;
+      void* mem = kalloc();
+      if (mem == 0) {
+        printf("mmcopy: no memory\n");
+        return -1;
+      }
+      memmove(mem, (char*)pa, PGSIZE);
+      int prot = 0;
+      if (v->prot & PROT_READ) prot |= PTE_R;
+      if (v->prot & PROT_WRITE) prot |= PTE_W;
+      if (mappages(new->pagetable, va, PGSIZE, (uint64)mem, prot | PTE_U | PTE_X) != 0){
+        kfree(mem);
+        printf("mmcopy: mappages failed\n");
+        return -1;
+      }
+    }
+  }
+  return 0;
+}
