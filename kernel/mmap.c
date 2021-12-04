@@ -52,6 +52,49 @@ uint64 sys_mmap(void) {
   return mmap(len, prot, flags, f);
 }
 
+int page_fault_handler(uint64 va) {
+  struct proc* p = myproc();
+  va = PGROUNDDOWN(va);
+  struct vma* current = 0;
+  for (int i = 0; i < p->nvma; i++) {
+    struct vma* v = &p->vma[i];
+    if (v->start <= va && va < v->end) {
+      current = v;
+      break;
+    }
+  }
+  if (current == 0) {
+    printf("page fault: no vma for %p\n", va);
+    return -1;
+  }
+  char* mem = kalloc();
+  memset(mem, 0, PGSIZE);
+  if (mem == 0) {
+    printf("page fault: no memory\n");
+    return -1;
+  }
+  int prot = 0;
+  if (current->prot & PROT_READ) prot |= PTE_R;
+  if (current->prot & PROT_WRITE) prot |= PTE_W;
+  if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, prot | PTE_U | PTE_X) < 0) {
+    printf("page fault: mappages failed\n");
+    kfree(mem);
+    return -1;
+  }
+  struct file* f = current->file;
+  int offset = va - current->start + current->offset;
+  int size = f->ip->size - offset;
+  if (size > PGSIZE) size = PGSIZE;
+  ilock(f->ip);
+  if (readi(f->ip, 1, va, offset, size) != size) {
+    iunlock(f->ip);
+    printf("page fault: readi failed\n");
+    return -1;
+  }
+  iunlock(f->ip);
+  return 0;
+}
+
 uint64 sys_munmap(void) {
   return -1;
 }
