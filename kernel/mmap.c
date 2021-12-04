@@ -95,6 +95,64 @@ int page_fault_handler(uint64 va) {
   return 0;
 }
 
+int munmap(uint64 va, int length) {
+  struct proc* p = myproc();
+  struct vma* current = 0;
+  int index = -1;
+  for (int i = 0; i < p->nvma; i++) {
+    struct vma* v = &p->vma[i];
+    if (v->start <= va && va < v->end) {
+      current = v;
+      index = i;
+      break;
+    }
+  }
+  if (va != current->start && va + length != current->end) {
+    printf("munmap: %p~%p not located at vma edge(%p~%p)\n", va, va + length, current->start, current->end);
+    return -1;
+  }
+  struct file* f = current->file;
+
+  if (walkaddr(p->pagetable, va)) {
+    // page mapped, write back and unmap
+    if (current->flags & MAP_SHARED) {
+      int offset = va - current->start + current->offset;
+      ilock(f->ip);
+      begin_op();
+      if (writei(f->ip, 1, va, offset, length) != length) {
+        end_op();
+        iunlock(f->ip);
+        printf("munmap: writei failed\n");
+        return -1;
+      }
+      end_op();
+      iunlock(f->ip);
+    }
+    uvmunmap(p->pagetable, PGROUNDDOWN(va), length / PGSIZE, 1);
+  }
+  
+  if (va == current->start) {
+    current->start += (length / PGSIZE) * PGSIZE;
+    current->offset += (length / PGSIZE) * PGSIZE;
+  } else {
+    current->end -= (length / PGSIZE) * PGSIZE;
+  }
+  // Free vma if whole block is empty
+  if (current->start == current->end) {
+    fileclose(f);
+    for (int i = index; i < p->nvma - 1; i++) {
+      p->vma[i] = p->vma[i + 1];
+    }
+    p->nvma--;
+  }
+  return 0;
+}
+
 uint64 sys_munmap(void) {
-  return -1;
+  uint64 addr;
+  int length;
+  if (argaddr(0, &addr) < 0 || argint(1, &length) < 0) {
+    return -1;
+  }
+  return munmap(addr, length);
 }
